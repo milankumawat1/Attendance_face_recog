@@ -1,0 +1,91 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Mark Attendance</h1>
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Webcam Feed</h5>
+                                <video id="video" width="100%" height="auto" autoplay></video>
+                                <canvas id="canvas" style="display: none;"></canvas>
+                                <div id="status" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Instructions</h5>
+                                <p>1. Position your face in the center of the webcam</p>
+                                <p>2. Make sure you are in a well-lit area</p>
+                                <p>3. Click the button below to mark your attendance</p>
+                                <button id="capture" class="btn btn-primary">Mark Attendance</button>
+                                {% csrf_token %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Webcam setup
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureButton = document.getElementById('capture');
+    const statusDiv = document.getElementById('status');
+
+    // Access webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(err => {
+            console.error("Error accessing webcam:", err);
+            statusDiv.innerHTML = '<div class="alert alert-danger">Error accessing webcam. Please make sure you have granted camera permissions.</div>';
+        });
+
+    // Capture image
+    captureButton.addEventListener('click', () => {
+        statusDiv.innerHTML = '<div class="alert alert-info">Processing...</div>';
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob and send to server
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append('image', blob, 'capture.jpg');
+
+            fetch('{% url "core:mark_attendance" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = '<div class="alert alert-success">Attendance marked successfully!</div>';
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<div class="alert alert-danger">Error marking attendance. Please try again.</div>';
+            });
+        }, 'image/jpeg');
+    });
+</script>
+{% endblock %} 

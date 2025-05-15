@@ -1,0 +1,106 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Welcome to Attendance System</h1>
+        <div class="card">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Face Recognition</h5>
+                                <video id="video" width="100%" height="auto" autoplay></video>
+                                <canvas id="canvas" style="display: none;"></canvas>
+                                <div id="status" class="mt-3"></div>
+                                <button id="capture" class="btn btn-primary mt-3">Scan Face</button>
+                                <button id="retry" class="btn btn-warning mt-3" style="display: none;">Retry</button>
+                                {% csrf_token %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="card-title">Instructions</h5>
+                                <p>1. Position your face in the center of the webcam</p>
+                                <p>2. Make sure you are in a well-lit area</p>
+                                <p>3. Click "Scan Face" to record your attendance</p>
+                                <p>4. The system will automatically determine if it's a check-in or check-out</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureButton = document.getElementById('capture');
+    const retryButton = document.getElementById('retry');
+    const statusDiv = document.getElementById('status');
+
+    // Access webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(err => {
+            console.error("Error accessing webcam:", err);
+            statusDiv.innerHTML = '<div class="alert alert-danger">Error accessing webcam. Please make sure you have granted camera permissions.</div>';
+        });
+
+    // Capture image
+    captureButton.addEventListener('click', () => {
+        statusDiv.innerHTML = '<div class="alert alert-info">Processing...</div>';
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob and send to server
+        canvas.toBlob(blob => {
+            const formData = new FormData();
+            formData.append('image', blob, 'capture.jpg');
+
+            fetch('{% url "core:mark_attendance" %}', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                    captureButton.style.display = 'none';
+                    retryButton.style.display = 'inline-block';
+                } else {
+                    statusDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                    captureButton.style.display = 'none';
+                    retryButton.style.display = 'inline-block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.innerHTML = '<div class="alert alert-danger">Error processing face. Please try again.</div>';
+                captureButton.style.display = 'none';
+                retryButton.style.display = 'inline-block';
+            });
+        }, 'image/jpeg');
+    });
+
+    // Handle retry button click
+    retryButton.addEventListener('click', () => {
+        statusDiv.innerHTML = '';
+        captureButton.style.display = 'inline-block';
+        retryButton.style.display = 'none';
+    });
+</script>
+{% endblock %} 

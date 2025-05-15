@@ -1,0 +1,224 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Register New Employee</h1>
+        <div class="card">
+            <div class="card-body">
+                <form id="registrationForm" method="POST">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Employee Details</h5>
+                                    <div class="mb-3">
+                                        <label for="username" class="form-label">Username</label>
+                                        <input type="text" class="form-control" id="username" name="username" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="password" class="form-label">Password</label>
+                                        <input type="password" class="form-control" id="password" name="password" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="first_name" class="form-label">First Name</label>
+                                        <input type="text" class="form-control" id="first_name" name="first_name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="last_name" class="form-label">Last Name</label>
+                                        <input type="text" class="form-control" id="last_name" name="last_name" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="email" class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="email" name="email" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="employee_id" class="form-label">Employee ID</label>
+                                        <input type="text" class="form-control" id="employee_id" name="employee_id" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="department" class="form-label">Department</label>
+                                        <input type="text" class="form-control" id="department" name="department" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="position" class="form-label">Position</label>
+                                        <input type="text" class="form-control" id="position" name="position" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">Face Capture</h5>
+                                    <p class="text-muted">Please position your face in the center of the webcam</p>
+                                    <div class="mb-3">
+                                        <video id="video" width="100%" height="auto" autoplay></video>
+                                        <canvas id="canvas" style="display: none;"></canvas>
+                                    </div>
+                                    <div id="capturedImage" class="mb-3">
+                                        <div class="capture-preview" id="preview">
+                                            <div class="retake-overlay" id="retake" style="display: none;">
+                                                <button class="btn btn-warning btn-sm retake-btn">Retake</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div id="status" class="mb-3"></div>
+                                    <button type="button" id="capture" class="btn btn-primary">Capture Face</button>
+                                    <button type="submit" id="submit" class="btn btn-success" disabled>Register Employee</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.capture-preview {
+    width: 100%;
+    height: 300px;
+    border: 2px dashed #ccc;
+    margin-bottom: 10px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+.retake-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.retake-btn {
+    z-index: 1;
+}
+
+.capture-preview.error {
+    border-color: #dc3545;
+}
+
+.capture-preview.success {
+    border-color: #28a745;
+}
+</style>
+
+<script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const captureButton = document.getElementById('capture');
+    const submitButton = document.getElementById('submit');
+    const statusDiv = document.getElementById('status');
+    const form = document.getElementById('registrationForm');
+    let capturedImage = null;
+
+    // Access webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+            video.srcObject = stream;
+        })
+        .catch(err => {
+            console.error("Error accessing webcam:", err);
+            statusDiv.innerHTML = '<div class="alert alert-danger">Error accessing webcam. Please make sure you have granted camera permissions.</div>';
+        });
+
+    // Capture image
+    captureButton.addEventListener('click', () => {
+        const context = canvas.getContext('2d');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Convert canvas to blob
+        canvas.toBlob(blob => {
+            capturedImage = blob;
+            
+            // Update preview
+            const preview = document.getElementById('preview');
+            preview.style.backgroundImage = `url(${URL.createObjectURL(blob)})`;
+            
+            // Enable submit button
+            submitButton.disabled = false;
+            captureButton.disabled = true;
+            
+            // Update status
+            statusDiv.innerHTML = '<div class="alert alert-success">Face captured! You can now register the employee.</div>';
+        }, 'image/jpeg');
+    });
+
+    // Handle retake button click
+    document.querySelector('.retake-btn').addEventListener('click', () => {
+        capturedImage = null;
+        const preview = document.getElementById('preview');
+        preview.style.backgroundImage = '';
+        document.getElementById('retake').style.display = 'none';
+        preview.classList.remove('error', 'success');
+        submitButton.disabled = true;
+        captureButton.disabled = false;
+        statusDiv.innerHTML = '<div class="alert alert-info">Please capture your face again</div>';
+    });
+
+    // Handle form submission
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        if (!capturedImage) {
+            statusDiv.innerHTML = '<div class="alert alert-danger">Please capture your face</div>';
+            return;
+        }
+
+        const formData = new FormData(form);
+        formData.append('image', capturedImage, 'face.jpg');
+
+        // Submit form
+        fetch('{% url "core:register_employee" %}', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                statusDiv.innerHTML = '<div class="alert alert-success">Employee registered successfully!</div>';
+                form.reset();
+                capturedImage = null;
+                submitButton.disabled = true;
+                captureButton.disabled = false;
+                const preview = document.getElementById('preview');
+                preview.style.backgroundImage = '';
+                preview.classList.remove('error', 'success');
+                document.getElementById('retake').style.display = 'none';
+            } else if (data.face_check_result) {
+                const preview = document.getElementById('preview');
+                const retakeOverlay = document.getElementById('retake');
+                
+                preview.classList.add('error');
+                preview.classList.remove('success');
+                retakeOverlay.style.display = 'flex';
+                statusDiv.innerHTML = `<div class="alert alert-danger">${data.face_check_result.message}</div>`;
+                submitButton.disabled = false;
+                captureButton.disabled = true;
+            } else {
+                statusDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            statusDiv.innerHTML = '<div class="alert alert-danger">Error registering employee. Please try again.</div>';
+        });
+    });
+</script>
+{% endblock %} 
